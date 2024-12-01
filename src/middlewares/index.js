@@ -1,5 +1,6 @@
 const { PREFIX, OWNER_NUMBER } = require("../config");
 const { toUserJid } = require("../utils");
+const { isUserMuted } = require("../utils/database");
 
 exports.verifyPrefix = (prefix) => PREFIX === prefix;
 exports.hasTypeOrCommand = ({ type, command }) => type && command;
@@ -28,4 +29,17 @@ exports.isAdmin = async ({ remoteJid, userJid, socket }) => {
   const isAdmin = participant.admin === "admin";
 
   return isOwner || isAdmin;
+};
+
+exports.onMessage = async ({ socket, message }) => {
+  const remoteJid = message.key.remoteJid;  // JID del grupo
+  const userJid = message.key.participant;  // JID del usuario que envió el mensaje
+
+  if (isUserMuted(remoteJid, userJid)) {
+    return socket.sendMessage(remoteJid, {
+      text: `👻 Krampus.bot 👻 Estás silenciado por 8 minutos.`,
+      mentions: [userJid],
+    });
+  }
+
 };

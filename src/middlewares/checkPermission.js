@@ -1,4 +1,5 @@
 const { OWNER_NUMBER } = require("../config");
+const { isUserMuted } = require("../utils/database"); // Importamos la función isUserMuted
 
 exports.checkPermission = async ({ type, socket, userJid, remoteJid }) => {
   if (type === "member") {
@@ -6,6 +7,12 @@ exports.checkPermission = async ({ type, socket, userJid, remoteJid }) => {
   }
 
   try {
+    // Verificamos si el usuario está silenciado
+    const isMuted = await isUserMuted(remoteJid, userJid); // Verificación de silenciado
+    if (isMuted) {
+      return false; // Si el usuario está silenciado, no tiene permisos
+    }
+
     const { participants, owner } = await socket.groupMetadata(remoteJid);
 
     const participant = participants.find(

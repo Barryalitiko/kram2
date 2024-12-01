@@ -8,7 +8,7 @@ const NOT_WELCOME_GROUPS_FILE = "not-welcome-groups";
 const INACTIVE_AUTO_RESPONDER_GROUPS_FILE = "inactive-auto-responder-groups";
 const ANTI_LINK_GROUPS_FILE = "anti-link-groups";
 const DELETED_MESSAGES_FILE = "deleted-messages";
-const muteUsers = {};
+const MUTED_USERS_FILE = "muted-users";
 
 function createIfNotExists(fullPath) {
   if (!fs.existsSync(fullPath)) {
@@ -171,22 +171,30 @@ exports.isActiveAntiFloodGroup = (groupId) => {
   return antiFloodGroups.includes(groupId);
 };
 
-exports.muteUserInGroup = (groupId, userJid, muteTime) => {
-  const muteEndTime = Date.now() + muteTime * 60 * 1000; // Tiempo de des-silencio calculado en milisegundos
-  if (!muteUsers[groupId]) muteUsers[groupId] = {};
-  
-  muteUsers[groupId][userJid] = muteEndTime;
-  console.log(`Usuario ${userJid} silenciado en el grupo ${groupId} por ${muteTime} minutos.`);
+exports.muteUser = (groupId, userJid, duration) => {
+  const mutedUsers = readJSON(MUTED_USERS_FILE);
+  if (!mutedUsers[groupId]) {
+    mutedUsers[groupId] = {};
+  }
 
-  setTimeout(() => {
-    unmuteUserInGroup(groupId, userJid);
-  }, muteTime * 60 * 1000);
+  mutedUsers[groupId][userJid] = Date.now() + duration;
+
+  writeJSON(MUTED_USERS_FILE, mutedUsers);
 };
 
-// Función para des-silenciar a un usuario
-exports.unmuteUserInGroup = (groupId, userJid) => {
-  if (muteUsers[groupId] && muteUsers[groupId][userJid]) {
-    delete muteUsers[groupId][userJid];
-    console.log(`Usuario ${userJid} des-silenciado en el grupo ${groupId}.`);
+exports.unmuteUser = (groupId, userJid) => {
+  const mutedUsers = readJSON(MUTED_USERS_FILE);
+  if (mutedUsers[groupId] && mutedUsers[groupId][userJid]) {
+    delete mutedUsers[groupId][userJid];
+    writeJSON(MUTED_USERS_FILE, mutedUsers);
   }
+};
+
+exports.isUserMuted = (groupId, userJid) => {
+  const mutedUsers = readJSON(MUTED_USERS_FILE);
+  const muteEndTime = mutedUsers[groupId]?.[userJid];
+  if (muteEndTime && muteEndTime > Date.now()) {
+    return true; // El usuario está silenciado
+  }
+  return false; // El usuario no está silenciado
 };

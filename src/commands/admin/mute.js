@@ -12,14 +12,15 @@ module.exports = {
       throw new InvalidParameterError("👻 Krampus.bot 👻 Menciona al usuario y usa 1 para silenciar o 0 para desilenciar.");
     }
 
-    const mentionedUserJid = args[0];  // JID del usuario mencionado
+    // Extraer correctamente el JID del usuario mencionado
+    const mentionedUserJid = args[0].replace('@', '').replace(/\D/g, '') + '@s.whatsapp.net'; 
     const action = args[1];  // 1 para silenciar, 0 para desilenciar
 
     if (action !== "1" && action !== "0") {
       throw new InvalidParameterError("👻 Krampus.bot 👻 Usa 1 para silenciar o 0 para desilenciar.");
     }
 
-    const muteDuration = 1000 * 60 * 10;  // Silenciar por 10 minutos (en milisegundos)
+    const muteDuration = 1000 * 60 * 8;  // Silenciar por 8 minutos (en milisegundos)
 
     if (action === "1") {
       // Silenciar al usuario por 8 minutos

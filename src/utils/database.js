@@ -8,6 +8,7 @@ const NOT_WELCOME_GROUPS_FILE = "not-welcome-groups";
 const INACTIVE_AUTO_RESPONDER_GROUPS_FILE = "inactive-auto-responder-groups";
 const ANTI_LINK_GROUPS_FILE = "anti-link-groups";
 const DELETED_MESSAGES_FILE = "deleted-messages";
+const muteUsers = {};
 
 function createIfNotExists(fullPath) {
   if (!fs.existsSync(fullPath)) {
@@ -168,4 +169,24 @@ exports.deactivateAntiFloodGroup = (groupId) => {
 exports.isActiveAntiFloodGroup = (groupId) => {
   const antiFloodGroups = readJSON("anti-flood-groups");
   return antiFloodGroups.includes(groupId);
+};
+
+exports.muteUserInGroup = (groupId, userJid, muteTime) => {
+  const muteEndTime = Date.now() + muteTime * 60 * 1000; // Tiempo de des-silencio calculado en milisegundos
+  if (!muteUsers[groupId]) muteUsers[groupId] = {};
+  
+  muteUsers[groupId][userJid] = muteEndTime;
+  console.log(`Usuario ${userJid} silenciado en el grupo ${groupId} por ${muteTime} minutos.`);
+
+  setTimeout(() => {
+    unmuteUserInGroup(groupId, userJid);
+  }, muteTime * 60 * 1000);
+};
+
+// Función para des-silenciar a un usuario
+exports.unmuteUserInGroup = (groupId, userJid) => {
+  if (muteUsers[groupId] && muteUsers[groupId][userJid]) {
+    delete muteUsers[groupId][userJid];
+    console.log(`Usuario ${userJid} des-silenciado en el grupo ${groupId}.`);
+  }
 };

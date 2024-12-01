@@ -1,6 +1,6 @@
 const { BOT_NAME, PREFIX } = require("../config");
 
-exports.waitMessage = "Carregando dados...";
+exports.waitMessage = "Krampus esta procesando...";
 
 exports.menuMessage = () => {
   const date = new Date();

@@ -172,7 +172,24 @@ exports.isActiveAntiFloodGroup = (groupId) => {
 };
 
 exports.muteUser = (groupId, userJid, duration) => {
+  if (typeof groupId !== "string" || !groupId.trim()) {
+    throw new Error("Invalid groupId");
+  }
+  if (typeof userJid !== "string" || !userJid.trim()) {
+    throw new Error("Invalid userJid");
+  }
+  if (typeof duration !== "number" || duration <= 0) {
+    throw new Error("Duration must be a positive number");
+  }
+
   const mutedUsers = readJSON(MUTED_USERS_FILE);
+
+  if (Array.isArray(mutedUsers) || typeof mutedUsers !== "object") {
+    console.warn(`Restructuring ${MUTED_USERS_FILE} to an object`);
+    writeJSON(MUTED_USERS_FILE, {}); // Corregir estructura si está mal
+    mutedUsers = {};
+  }
+
   if (!mutedUsers[groupId]) {
     mutedUsers[groupId] = {};
   }
@@ -183,18 +200,68 @@ exports.muteUser = (groupId, userJid, duration) => {
 };
 
 exports.unmuteUser = (groupId, userJid) => {
-  const mutedUsers = readJSON(MUTED_USERS_FILE);
-  if (mutedUsers[groupId] && mutedUsers[groupId][userJid]) {
-    delete mutedUsers[groupId][userJid];
-    writeJSON(MUTED_USERS_FILE, mutedUsers);
+  if (typeof groupId !== "string" || !groupId.trim()) {
+    throw new Error("Invalid groupId");
   }
+  if (typeof userJid !== "string" || !userJid.trim()) {
+    throw new Error("Invalid userJid");
+  }
+
+  let mutedUsers = readJSON(MUTED_USERS_FILE);
+
+  if (Array.isArray(mutedUsers) || typeof mutedUsers !== "object") {
+    console.warn(`Restructuring ${MUTED_USERS_FILE} to an object`);
+    writeJSON(MUTED_USERS_FILE, {}); // Corregir estructura si está mal
+    mutedUsers = {};
+  }
+
+
+  if (mutedUsers[groupId] && typeof mutedUsers[groupId] === "object") {
+
+    if (mutedUsers[groupId][userJid]) {
+      delete mutedUsers[groupId][userJid]; // Eliminar al usuario silenciado
+    }
+
+
+    if (Object.keys(mutedUsers[groupId]).length === 0) {
+      delete mutedUsers[groupId];
+    }
+  }
+
+
+  writeJSON(MUTED_USERS_FILE, mutedUsers);
 };
 
 exports.isUserMuted = (groupId, userJid) => {
-  const mutedUsers = readJSON(MUTED_USERS_FILE);
-  const muteEndTime = mutedUsers[groupId]?.[userJid];
-  if (muteEndTime && muteEndTime > Date.now()) {
-    return true; // El usuario está silenciado
+  // Validaciones básicas
+  if (typeof groupId !== "string" || !groupId.trim()) {
+    throw new Error("Invalid groupId");
   }
-  return false; // El usuario no está silenciado
+  if (typeof userJid !== "string" || !userJid.trim()) {
+    throw new Error("Invalid userJid");
+  }
+
+  // Leer el archivo de usuarios silenciados
+  const mutedUsers = readJSON(MUTED_USERS_FILE);
+
+  // Asegurar que la estructura sea un objeto
+  if (Array.isArray(mutedUsers) || typeof mutedUsers !== "object") {
+    console.warn(`Restructuring ${MUTED_USERS_FILE} to an object`);
+    return false; // Si el archivo no es válido, asumir que no hay usuarios silenciados
+  }
+
+  // Verificar que el grupo exista
+  const groupMutedUsers = mutedUsers[groupId];
+  if (!groupMutedUsers || typeof groupMutedUsers !== "object") {
+    return false; // El grupo no tiene usuarios silenciados
+  }
+
+  // Verificar si el usuario está silenciado
+  const muteEndTime = groupMutedUsers[userJid];
+  if (typeof muteEndTime !== "number") {
+    return false; // Si el tiempo no es válido, asumir que no está silenciado
+  }
+
+  // Verificar si el silencio ha expirado
+  return muteEndTime > Date.now(); // Retorna true si sigue silenciado, false si no
 };

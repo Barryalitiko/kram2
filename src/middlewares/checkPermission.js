@@ -1,45 +1,66 @@
 const { OWNER_NUMBER } = require("../config");
-const { isUserMuted } = require("../utils/database"); // Importamos la función isUserMuted
+const { isUserMuted } = require("../utils/database");
 
 exports.checkPermission = async ({ type, socket, userJid, remoteJid }) => {
-  if (type === "member") {
-    return true;
-  }
-
   try {
-    // Verificamos si el usuario está silenciado
-    const isMuted = await isUserMuted(remoteJid, userJid); // Verificación de silenciado
-    if (isMuted) {
-      return false; // Si el usuario está silenciado, no tiene permisos
+    // 1. Validar el tipo solicitado
+    if (!["member", "admin", "owner"].includes(type)) {
+      throw new Error(`Tipo de permiso desconocido: ${type}`);
     }
 
-    const { participants, owner } = await socket.groupMetadata(remoteJid);
+    // 2. Los "members" siempre tienen permisos
+    if (type === "member") {
+      return true;
+    }
 
-    const participant = participants.find(
-      (participant) => participant.id === userJid
-    );
-
-    if (!participant) {
+    // 3. Obtener metadatos del grupo
+    const metadata = await socket.groupMetadata(remoteJid);
+    if (!metadata || !metadata.participants) {
+      console.error("No se pudieron obtener los metadatos del grupo.");
       return false;
     }
 
-    const isOwner =
-      participant.id === owner || participant.admin === "superadmin";
+    const { participants, owner } = metadata;
 
+    // 4. Verificar la existencia del participante
+    const participant = participants.find((p) => p.id === userJid);
+    if (!participant) {
+      console.error(`El usuario ${userJid} no está en el grupo.`);
+      return false;
+    }
+
+    // 5. Determinar los roles del usuario
+    const isOwner = participant.id === owner || participant.admin === "superadmin";
     const isAdmin = participant.admin === "admin";
-
     const isBotOwner = userJid === `${OWNER_NUMBER}@s.whatsapp.net`;
 
+    // 6. Validar permisos según el tipo solicitado
+    let hasPermission = false;
+
     if (type === "admin") {
-      return isOwner || isAdmin || isBotOwner;
+      hasPermission = isOwner || isAdmin || isBotOwner;
     }
 
     if (type === "owner") {
-      return isOwner || isBotOwner;
+      hasPermission = isOwner || isBotOwner;
     }
 
-    return false;
+    // 7. Si el usuario no tiene permiso basado en roles, salir temprano
+    if (!hasPermission) {
+      return false;
+    }
+
+    // 8. Verificar si el usuario está silenciado
+    const isMuted = await isUserMuted(remoteJid, userJid);
+    if (isMuted) {
+      console.log(`Usuario ${userJid} está silenciado en el grupo ${remoteJid}.`);
+      return false;
+    }
+
+    // 9. Si pasó todas las verificaciones
+    return true;
   } catch (error) {
+    console.error("Error en checkPermission:", error.message);
     return false;
   }
 };

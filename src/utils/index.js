@@ -106,9 +106,7 @@ exports.baileysIs = (webMessage, context) => {
 exports.getContent = (webMessage, context) => {
   return (
     webMessage.message?.[`${context}Message`] ||
-    webMessage.message?.extendedTextMessage?.contextInfo?.quotedMessage?.[
-      `${context}Message`
-    ]
+    webMessage.message?.extendedTextMessage?.contextInfo?.quotedMessage?.[`${context}Message`]
   );
 };
 
@@ -119,72 +117,91 @@ exports.download = async (webMessage, fileName, context, extension) => {
     return null;
   }
 
-  const stream = await downloadContentFromMessage(content, context);
+  try {
+    const stream = await downloadContentFromMessage(content, context);
 
-  let buffer = Buffer.from([]);
+    let buffer = Buffer.from([]);
 
-  for await (const chunk of stream) {
-    buffer = Buffer.concat([buffer, chunk]);
+    for await (const chunk of stream) {
+      buffer = Buffer.concat([buffer, chunk]);
+    }
+
+    const filePath = path.resolve(TEMP_DIR, `${fileName}.${extension}`);
+
+    await writeFile(filePath, buffer);
+
+    return filePath;
+  } catch (error) {
+    console.error("Error downloading content: ", error);
+    return null;
   }
-
-  const filePath = path.resolve(TEMP_DIR, `${fileName}.${extension}`);
-
-  await writeFile(filePath, buffer);
-
-  return filePath;
 };
 
 exports.findCommandImport = (commandName) => {
-  const command = this.readCommandImports();
+  try {
+    const command = this.readCommandImports();
 
-  let typeReturn = "";
-  let targetCommandReturn = null;
+    let typeReturn = "";
+    let targetCommandReturn = null;
 
-  for (const [type, commands] of Object.entries(command)) {
-    if (!commands.length) {
-      continue;
+    for (const [type, commands] of Object.entries(command)) {
+      if (!commands.length) {
+        continue;
+      }
+
+      const targetCommand = commands.find((cmd) =>
+        cmd.commands.map((cmd) => this.formatCommand(cmd)).includes(commandName)
+      );
+
+      if (targetCommand) {
+        typeReturn = type;
+        targetCommandReturn = targetCommand;
+        break;
+      }
     }
 
-    const targetCommand = commands.find((cmd) =>
-      cmd.commands.map((cmd) => this.formatCommand(cmd)).includes(commandName)
-    );
-
-    if (targetCommand) {
-      typeReturn = type;
-      targetCommandReturn = targetCommand;
-      break;
+    if (!targetCommandReturn) {
+      throw new Error(`Comando no encontrado: ${commandName}`);
     }
+
+    return {
+      type: typeReturn,
+      command: targetCommandReturn,
+    };
+  } catch (error) {
+    console.error("Error finding command: ", error);
+    throw error;
   }
-
-  return {
-    type: typeReturn,
-    command: targetCommandReturn,
-  };
 };
 
 exports.readCommandImports = () => {
-  const subdirectories = fs
-    .readdirSync(COMMANDS_DIR, { withFileTypes: true })
-    .filter((directory) => directory.isDirectory())
-    .map((directory) => directory.name);
+  try {
+    const subdirectories = fs
+      .readdirSync(COMMANDS_DIR, { withFileTypes: true })
+      .filter((directory) => directory.isDirectory())
+      .map((directory) => directory.name);
 
-  const commandImports = {};
+    const commandImports = {};
 
-  for (const subdir of subdirectories) {
-    const subdirectoryPath = path.join(COMMANDS_DIR, subdir);
-    const files = fs
-      .readdirSync(subdirectoryPath)
-      .filter(
-        (file) =>
-          !file.startsWith("_") &&
-          (file.endsWith(".js") || file.endsWith(".ts"))
-      )
-      .map((file) => require(path.join(subdirectoryPath, file)));
+    for (const subdir of subdirectories) {
+      const subdirectoryPath = path.join(COMMANDS_DIR, subdir);
+      const files = fs
+        .readdirSync(subdirectoryPath)
+        .filter(
+          (file) =>
+            !file.startsWith("_") &&
+            (file.endsWith(".js") || file.endsWith(".ts"))
+        )
+        .map((file) => require(path.join(subdirectoryPath, file)));
 
-    commandImports[subdir] = files;
+      commandImports[subdir] = files;
+    }
+
+    return commandImports;
+  } catch (error) {
+    console.error("Error reading command imports: ", error);
+    throw error;
   }
-
-  return commandImports;
 };
 
 const onlyNumbers = (text) => text.replace(/[^0-9]/g, "");
@@ -210,7 +227,10 @@ exports.getBuffer = (url, options) => {
       .then((res) => {
         resolve(res.data);
       })
-      .catch(reject);
+      .catch((error) => {
+        console.error("Error fetching buffer: ", error);
+        reject(error);
+      });
   });
 };
 
